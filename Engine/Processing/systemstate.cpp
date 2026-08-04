@@ -488,6 +488,10 @@ SystemState::SystemState(const AbstractRHXController* controller_, StimStepSize 
     tScale->setValue("2000");
 
     yScaleWide = new DiscreteItemList("WideScaleMicroVolts", globalItems, this);
+    yScaleWide->addItem("5", "5 " + MicroVoltsSymbol, 5.0);
+    yScaleWide->addItem("10", "10 " + MicroVoltsSymbol, 10.0);
+    yScaleWide->addItem("20", "20 " + MicroVoltsSymbol, 20.0);
+    yScaleWide->addItem("25", "25 " + MicroVoltsSymbol, 25.0);
     yScaleWide->addItem("50", "50 " + MicroVoltsSymbol, 50.0 );
     yScaleWide->addItem("100", "100 " + MicroVoltsSymbol, 100.0 );
     yScaleWide->addItem("200", "200 " + MicroVoltsSymbol, 200.0 );
@@ -498,6 +502,10 @@ SystemState::SystemState(const AbstractRHXController* controller_, StimStepSize 
     yScaleWide->setValue("500");
 
     yScaleLow = new DiscreteItemList("LowScaleMicroVolts", globalItems, this);
+    yScaleLow->addItem("5", "5 " + MicroVoltsSymbol, 5.0);
+    yScaleLow->addItem("10", "10 " + MicroVoltsSymbol, 10.0);
+    yScaleLow->addItem("20", "20 " + MicroVoltsSymbol, 20.0);
+    yScaleLow->addItem("25", "25 " + MicroVoltsSymbol, 25.0);
     yScaleLow->addItem("50", "50 " + MicroVoltsSymbol, 50.0 );
     yScaleLow->addItem("100", "100 " + MicroVoltsSymbol, 100.0 );
     yScaleLow->addItem("200", "200 " + MicroVoltsSymbol, 200.0 );
@@ -508,6 +516,10 @@ SystemState::SystemState(const AbstractRHXController* controller_, StimStepSize 
     yScaleLow->setValue("500");
 
     yScaleHigh = new DiscreteItemList("HighScaleMicroVolts", globalItems, this);
+    yScaleHigh->addItem("5", "5 " + MicroVoltsSymbol, 5.0);
+    yScaleHigh->addItem("10", "10 " + MicroVoltsSymbol, 10.0);
+    yScaleHigh->addItem("20", "20 " + MicroVoltsSymbol, 20.0);
+    yScaleHigh->addItem("25", "25 " + MicroVoltsSymbol, 25.0);
     yScaleHigh->addItem("50", "50 " + MicroVoltsSymbol, 50.0 );
     yScaleHigh->addItem("100", "100 " + MicroVoltsSymbol, 100.0 );
     yScaleHigh->addItem("200", "200 " + MicroVoltsSymbol, 200.0 );
@@ -713,6 +725,10 @@ SystemState::SystemState(const AbstractRHXController* controller_, StimStepSize 
     // Spike scope
     spikeScopeChannel = new ChannelNameItem("SpikeScopeChannel", globalItems, this, "N/A");
     yScaleSpikeScope = new DiscreteItemList("SpikeScopeScaleMicroVolts", globalItems, this);
+    yScaleSpikeScope->addItem("5", "5 " + MicroVoltsSymbol, 5.0);
+    yScaleSpikeScope->addItem("10", "10 " + MicroVoltsSymbol, 10.0);
+    yScaleSpikeScope->addItem("20", "20 " + MicroVoltsSymbol, 20.0);
+    yScaleSpikeScope->addItem("25", "25 " + MicroVoltsSymbol, 25.0);
     yScaleSpikeScope->addItem("50", "50 " + MicroVoltsSymbol, 50.0);
     yScaleSpikeScope->addItem("100", "100 " + MicroVoltsSymbol, 100.0);
     yScaleSpikeScope->addItem("200", "200 " + MicroVoltsSymbol, 200.0);
