@@ -32,11 +32,19 @@
 #include <QSettings>
 #include "spikesortingdialog.h"
 
-SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, QWidget *parent) :
+SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, int scopeNumber_,
+                                        const QString& initialChannelName, QWidget *parent) :
     QDialog(parent),
     state(state_),
-    controllerInterface(controllerInterface_)
+    controllerInterface(controllerInterface_),
+    scopeNumber(scopeNumber_)
 {
+    viewState.channelName = initialChannelName;
+    viewState.voltageScaleMicroVolts = state->yScaleSpikeScope->getNumericValue();
+    viewState.timeScaleMilliseconds = state->tScaleSpikeScope->getNumericValue();
+    viewState.numberOfSpikes = static_cast<int>(state->numSpikesDisplayed->getNumericValue());
+    viewState.showArtifacts = state->artifactsShown->getValue();
+
     setAcceptDrops(true);
     connect(state, SIGNAL(stateChanged()), this, SLOT(updateFromState()));
 
@@ -53,15 +61,12 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     thresholdSpinBox->setSuffix(" " + MicroVoltsSymbol);
 
     voltageScaleComboBox = new QComboBox(this);
-    state->yScaleSpikeScope->setupComboBox(voltageScaleComboBox);
-    connect(voltageScaleComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setVoltageScale(int)));
-
     timeScaleComboBox = new QComboBox(this);
-    state->tScaleSpikeScope->setupComboBox(timeScaleComboBox);
-    connect(timeScaleComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setTimeScale(int)));
-
     showSpikesComboBox = new QComboBox(this);
-    state->numSpikesDisplayed->setupComboBox(showSpikesComboBox);
+
+    populateScopeComboBoxes();
+    connect(voltageScaleComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setVoltageScale(int)));
+    connect(timeScaleComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setTimeScale(int)));
     connect(showSpikesComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setNumSpikesDisplayed(int)));
 
     clearScopeButton = new QPushButton(tr("Clear Scope"), this);
@@ -159,7 +164,21 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     saveSpikeSortingParametersButton = new QPushButton(tr("Save Detection Parameters"), this);
     connect(saveSpikeSortingParametersButton, SIGNAL(clicked(bool)), this, SLOT(saveSpikeSortingParameters()));
 
-    spikePlot = new SpikePlot(state, this);
+    spikePlot = new SpikePlot(state, &viewState, this);
+    connect(spikePlot, &SpikePlot::zoomInVoltageRequested, this, [this]() {
+        voltageScaleComboBox->setCurrentIndex(qMax(0, voltageScaleComboBox->currentIndex() - 1));
+    });
+    connect(spikePlot, &SpikePlot::zoomOutVoltageRequested, this, [this]() {
+        voltageScaleComboBox->setCurrentIndex(qMin(voltageScaleComboBox->count() - 1,
+                                                   voltageScaleComboBox->currentIndex() + 1));
+    });
+    connect(spikePlot, &SpikePlot::zoomInTimeRequested, this, [this]() {
+        timeScaleComboBox->setCurrentIndex(qMax(0, timeScaleComboBox->currentIndex() - 1));
+    });
+    connect(spikePlot, &SpikePlot::zoomOutTimeRequested, this, [this]() {
+        timeScaleComboBox->setCurrentIndex(qMin(timeScaleComboBox->count() - 1,
+                                                timeScaleComboBox->currentIndex() + 1));
+    });
 
     QHBoxLayout *channelRow = new QHBoxLayout;
     channelRow->addWidget(channelName);
@@ -241,10 +260,10 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
 
     spikeSettingsInterface = new XMLInterface(state, controllerInterface, XMLIncludeSpikeSortingParameters);
 
-    state->updateForChangeHeadstages();
-
-    state->signalSources->channelByName(state->spikeScopeChannel->getValue())->setupSpikeThresholdSpinBox(thresholdSpinBox);
     connect(thresholdSpinBox, SIGNAL(valueChanged(int)), this, SLOT(setVoltageThreshold(int)));
+
+    changeCurrentChannel(viewState.channelName);
+    refreshScopeWidgets();
 
     if (state->running) updateForRun();
     else updateForStop();
@@ -286,62 +305,133 @@ void SpikeSortingDialog::dropEvent(QDropEvent *event)
     }
 }
 
-void SpikeSortingDialog::updateFromState()
+void SpikeSortingDialog::populateScopeComboBoxes()
 {
-    // Check if single channel selection has changed at all.
-    QString channelNativeName = state->signalSources->singleSelectedAmplifierChannelName();
-    if (channelNativeName != state->spikeScopeChannel->getValue()) {
-        if (!channelNativeName.isEmpty()) {
-            setToSelectedButton->setEnabled(true);
-            if (lockScopeCheckbox->isChecked()) {
-                changeCurrentChannel(channelNativeName);
-            }
-        } else {
-            setToSelectedButton->setEnabled(false); // (a) Disable setToSelectedButton.
-        }
+    for (int i = 0; i < state->yScaleSpikeScope->numberOfItems(); ++i) {
+        voltageScaleComboBox->addItem(state->yScaleSpikeScope->getDisplayValueString(i),
+                                       state->yScaleSpikeScope->getNumericValue(i));
+    }
+    for (int i = 0; i < state->tScaleSpikeScope->numberOfItems(); ++i) {
+        timeScaleComboBox->addItem(state->tScaleSpikeScope->getDisplayValueString(i),
+                                    state->tScaleSpikeScope->getNumericValue(i));
+    }
+    for (int i = 0; i < state->numSpikesDisplayed->numberOfItems(); ++i) {
+        showSpikesComboBox->addItem(state->numSpikesDisplayed->getDisplayValueString(i),
+                                    state->numSpikesDisplayed->getNumericValue(i));
+    }
+}
+
+void SpikeSortingDialog::refreshScopeWidgets()
+{
+    QString selectedChannel = state->signalSources->singleSelectedAmplifierChannelName();
+    setToSelectedButton->setEnabled(!selectedChannel.isEmpty());
+
+    QString displayName = state->signalSources->getNativeAndCustomNames(viewState.channelName);
+    channelName->setText(displayName.isEmpty() ? tr("N/A") : displayName);
+
+    Channel* channel = state->signalSources->channelByName(viewState.channelName);
+    thresholdSpinBox->setEnabled(channel != nullptr);
+    if (channel && thresholdSpinBox->value() != channel->getSpikeThreshold()) {
+        QSignalBlocker blocker(thresholdSpinBox);
+        thresholdSpinBox->setValue(channel->getSpikeThreshold());
     }
 
-    // Update channel name label.
-    if (channelName->text() != state->spikeScopeChannel->getValue()) {
-        channelName->setText(state->signalSources->getNativeAndCustomNames(state->spikeScopeChannel->getValue()));
+    int voltageIndex = voltageScaleComboBox->findData(viewState.voltageScaleMicroVolts);
+    if (voltageIndex >= 0 && voltageScaleComboBox->currentIndex() != voltageIndex) {
+        QSignalBlocker blocker(voltageScaleComboBox);
+        voltageScaleComboBox->setCurrentIndex(voltageIndex);
     }
-    if (channelName->text().isEmpty()) {
-        channelName->setText(tr("N/A"));
+    int timeIndex = timeScaleComboBox->findData(viewState.timeScaleMilliseconds);
+    if (timeIndex >= 0 && timeScaleComboBox->currentIndex() != timeIndex) {
+        QSignalBlocker blocker(timeScaleComboBox);
+        timeScaleComboBox->setCurrentIndex(timeIndex);
     }
-
-    // Update spike plot if channel has changed.
-    if (spikePlot->getWaveform() != state->spikeScopeChannel->getValue()) {
-        spikePlot->setWaveform(state->spikeScopeChannel->getValue().toStdString());
-    }
-
-    // Update spike threshold if spikeScopeChannel exists.
-    QString channelName = state->spikeScopeChannel->getValue();
-
-    if (channelName != "N/A") {
-        if (thresholdSpinBox->value() != state->signalSources->channelByName(channelName)->getSpikeThreshold()) {
-            thresholdSpinBox->setValue(state->signalSources->channelByName(channelName)->getSpikeThreshold());
-        }
+    int spikesIndex = showSpikesComboBox->findData(viewState.numberOfSpikes);
+    if (spikesIndex >= 0 && showSpikesComboBox->currentIndex() != spikesIndex) {
+        QSignalBlocker blocker(showSpikesComboBox);
+        showSpikesComboBox->setCurrentIndex(spikesIndex);
     }
 
-    if (voltageScaleComboBox->currentIndex() != state->yScaleSpikeScope->getIndex())
-        voltageScaleComboBox->setCurrentIndex(state->yScaleSpikeScope->getIndex());
-
-    if (timeScaleComboBox->currentIndex() != state->tScaleSpikeScope->getIndex())
-        timeScaleComboBox->setCurrentIndex(state->tScaleSpikeScope->getIndex());
-
-    if (showSpikesComboBox->currentIndex() != state->numSpikesDisplayed->getIndex())
-        showSpikesComboBox->setCurrentIndex(state->numSpikesDisplayed->getIndex());
-
-    if (suppressionCheckBox->isChecked() != state->suppressionEnabled->getValue())
+    if (suppressionCheckBox->isChecked() != state->suppressionEnabled->getValue()) {
+        QSignalBlocker blocker(suppressionCheckBox);
         suppressionCheckBox->setChecked(state->suppressionEnabled->getValue());
-
-    if (artifactsShownCheckBox->isChecked() != state->artifactsShown->getValue())
-        artifactsShownCheckBox->setChecked(state->artifactsShown->getValue());
-
-    if (suppressionThresholdSpinBox->value() != state->suppressionThreshold->getValue())
+    }
+    artifactsShownCheckBox->setChecked(viewState.showArtifacts);
+    artifactsShownCheckBox->setEnabled(state->suppressionEnabled->getValue());
+    suppressionThresholdLabel1->setEnabled(state->suppressionEnabled->getValue());
+    suppressionThresholdSpinBox->setEnabled(state->suppressionEnabled->getValue());
+    if (suppressionThresholdSpinBox->value() != state->suppressionThreshold->getValue()) {
+        QSignalBlocker blocker(suppressionThresholdSpinBox);
         suppressionThresholdSpinBox->setValue(state->suppressionThreshold->getValue());
+    }
 
     updateTitle();
+}
+
+void SpikeSortingDialog::updateFromState()
+{
+    QString selectedChannel = state->signalSources->singleSelectedAmplifierChannelName();
+    if (lockScopeCheckbox->isChecked() && !selectedChannel.isEmpty() && selectedChannel != viewState.channelName) {
+        changeCurrentChannel(selectedChannel);
+        return;
+    }
+    refreshScopeWidgets();
+    spikePlot->update();
+}
+
+void SpikeSortingDialog::setVoltageThreshold(int threshold)
+{
+    Channel* channel = state->signalSources->channelByName(viewState.channelName);
+    if (channel) channel->setSpikeThreshold(threshold);
+}
+
+void SpikeSortingDialog::setVoltageScale(int index)
+{
+    if (index < 0) return;
+    viewState.voltageScaleMicroVolts = voltageScaleComboBox->itemData(index).toDouble();
+    spikePlot->update();
+}
+
+void SpikeSortingDialog::setTimeScale(int index)
+{
+    if (index < 0) return;
+    viewState.timeScaleMilliseconds = timeScaleComboBox->itemData(index).toDouble();
+    spikePlot->update();
+}
+
+void SpikeSortingDialog::setNumSpikesDisplayed(int index)
+{
+    if (index < 0) return;
+    viewState.numberOfSpikes = showSpikesComboBox->itemData(index).toInt();
+    spikePlot->update();
+}
+
+void SpikeSortingDialog::changeCurrentChannel(const QString& nativeChannelName)
+{
+    Channel* channel = state->signalSources->channelByName(nativeChannelName);
+    if (!channel) return;
+
+    viewState.channelName = channel->getNativeName();
+    spikePlot->setWaveform(viewState.channelName.toStdString());
+    channel->setupSpikeThresholdSpinBox(thresholdSpinBox);
+    refreshScopeWidgets();
+}
+
+void SpikeSortingDialog::toggleLock()
+{
+    if (lockScopeCheckbox->isChecked()) setToSelected();
+    else refreshScopeWidgets();
+}
+
+void SpikeSortingDialog::toggleArtifactsShown(bool enabled)
+{
+    viewState.showArtifacts = enabled;
+    spikePlot->update();
+}
+
+void SpikeSortingDialog::setSuppressionThreshold()
+{
+    state->suppressionThreshold->setValue(suppressionThresholdSpinBox->value());
 }
 
 void SpikeSortingDialog::updateForRun()
@@ -363,7 +453,14 @@ void SpikeSortingDialog::updateForStop()
 
 void SpikeSortingDialog::updateForChangeHeadstages()
 {
-    spikePlot->setWaveform(state->spikeScopeChannel->getValue().toStdString());
+    if (!state->signalSources->channelByName(viewState.channelName)) {
+        QString fallbackChannel = state->signalSources->singleSelectedAmplifierChannelName();
+        if (fallbackChannel.isEmpty()) fallbackChannel = state->signalSources->firstChannelName();
+        changeCurrentChannel(fallbackChannel);
+    } else {
+        spikePlot->setWaveform(viewState.channelName.toStdString());
+        refreshScopeWidgets();
+    }
 }
 
 void SpikeSortingDialog::activate()
@@ -439,5 +536,5 @@ void SpikeSortingDialog::toggleSuppressionEnabled(bool enabled)
 
 void SpikeSortingDialog::updateTitle()
 {
-    setWindowTitle(tr("Spike Scope") + " (" + state->spikeScopeChannel->getValue() + ")");
+    setWindowTitle(tr("Spike Scope %1 — %2").arg(scopeNumber).arg(viewState.channelName.isEmpty() ? tr("N/A") : viewState.channelName));
 }

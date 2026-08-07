@@ -57,7 +57,7 @@ ControlWindow::ControlWindow(SystemState* state_, CommandParser* parser_, Contro
     isiDialog(nullptr),
     psthDialog(nullptr),
     spectrogramDialog(nullptr),
-    spikeSortingDialog(nullptr),
+    nextSpikeScopeNumber(1),
     fileMenu(nullptr),
     displayMenu(nullptr),
     channelMenu(nullptr),
@@ -385,10 +385,7 @@ ControlWindow::~ControlWindow()
         spectrogramDialog->close();
         delete spectrogramDialog;
     }
-    if (spikeSortingDialog) {
-        spikeSortingDialog->close();
-        delete spikeSortingDialog;
-    }
+    closeSpikeSortingDialogs();
     if (triggerRecordDialog) {
         triggerRecordDialog->close();
         delete triggerRecordDialog;
@@ -415,6 +412,27 @@ ControlWindow::~ControlWindow()
         settings.setValue("isControlPanelExpanded", !controlPanel->isHidden());
         settings.setValue("controlPanelTab", controlPanel->currentTabName());
     }
+}
+
+void ControlWindow::pruneSpikeSortingDialogs()
+{
+    for (int i = spikeSortingDialogs.size() - 1; i >= 0; --i) {
+        if (spikeSortingDialogs.at(i).isNull()) {
+            spikeSortingDialogs.removeAt(i);
+        }
+    }
+}
+
+void ControlWindow::closeSpikeSortingDialogs()
+{
+    controllerInterface->clearSpikeSortingDialogs();
+    for (const auto& dialog : spikeSortingDialogs) {
+        if (dialog) {
+            dialog->setAttribute(Qt::WA_DeleteOnClose, false);
+            delete dialog;
+        }
+    }
+    spikeSortingDialogs.clear();
 }
 
 void ControlWindow::dragEnterEvent(QDragEnterEvent *event)
@@ -871,8 +889,9 @@ void ControlWindow::updateForChangeHeadstages()
         spectrogramDialog->updateForChangeHeadstages();
     }
 
-    if (spikeSortingDialog) {
-        spikeSortingDialog->updateForChangeHeadstages();
+    pruneSpikeSortingDialogs();
+    for (const auto& dialog : spikeSortingDialogs) {
+        if (dialog) dialog->updateForChangeHeadstages();
     }
 }
 
@@ -943,7 +962,10 @@ void ControlWindow::updateForRun()
     if (isiDialog) isiDialog->updateForRun();
     if (psthDialog) psthDialog->updateForRun();
     if (spectrogramDialog) spectrogramDialog->updateForRun();
-    if (spikeSortingDialog) spikeSortingDialog->updateForRun();
+    pruneSpikeSortingDialogs();
+    for (const auto& dialog : spikeSortingDialogs) {
+        if (dialog) dialog->updateForRun();
+    }
     if (probeMapWindow) probeMapWindow->updateForRun();
 
     if (!state->recording && !state->triggerSet) {
@@ -997,7 +1019,10 @@ void ControlWindow::updateForLoad()
     if (isiDialog) isiDialog->updateForLoad();
     if (psthDialog) psthDialog->updateForLoad();
     if (spectrogramDialog) spectrogramDialog->updateForLoad();
-    if (spikeSortingDialog) spikeSortingDialog->updateForLoad();
+    pruneSpikeSortingDialogs();
+    for (const auto& dialog : spikeSortingDialogs) {
+        if (dialog) dialog->updateForLoad();
+    }
     if (probeMapWindow) probeMapWindow->updateForLoad();
 
     setStatusBarLoading();
@@ -1063,7 +1088,10 @@ void ControlWindow::updateForStop()
     if (isiDialog) isiDialog->updateForStop();
     if (psthDialog) psthDialog->updateForStop();
     if (spectrogramDialog) spectrogramDialog->updateForStop();
-    if (spikeSortingDialog) spikeSortingDialog->updateForStop();
+    pruneSpikeSortingDialogs();
+    for (const auto& dialog : spikeSortingDialogs) {
+        if (dialog) dialog->updateForStop();
+    }
     if (probeMapWindow) probeMapWindow->updateForStop();
 
     controlPanel->updateForStop();
@@ -1261,11 +1289,17 @@ void ControlWindow::performance()
 
 void ControlWindow::spikeSorting()
 {
-    if (!spikeSortingDialog) {
-        spikeSortingDialog = new SpikeSortingDialog(state, controllerInterface, this);
-        controllerInterface->setSpikeSortingDialog(spikeSortingDialog);
-    }
-    spikeSortingDialog->activate();
+    pruneSpikeSortingDialogs();
+
+    QString initialChannel = state->signalSources->singleSelectedAmplifierChannelName();
+    if (initialChannel.isEmpty()) initialChannel = state->signalSources->firstChannelName();
+
+    auto *dialog = new SpikeSortingDialog(state, controllerInterface, nextSpikeScopeNumber++, initialChannel, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    spikeSortingDialogs.append(dialog);
+    controllerInterface->addSpikeSortingDialog(dialog);
+    connect(dialog, &QObject::destroyed, this, [this](QObject*) { pruneSpikeSortingDialogs(); });
+    dialog->activate();
 }
 
 void ControlWindow::chooseFileFormatDialog()
@@ -1982,12 +2016,7 @@ void ControlWindow::updateMenus()
             spectrogramDialog = nullptr;
             controllerInterface->setSpectrogramDialog(spectrogramDialog);
         }
-        if (spikeSortingDialog) {
-            spikeSortingDialog->close();
-            delete spikeSortingDialog;
-            spikeSortingDialog = nullptr;
-            controllerInterface->setSpikeSortingDialog(spikeSortingDialog);
-        }
+        closeSpikeSortingDialogs();
     }
 
     // Only allow copying of stim parameters if a single channel is selected, and it must be headstage, analog out, or digital out

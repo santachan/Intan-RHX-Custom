@@ -219,7 +219,8 @@ private:
     ISIDialog *isiDialog;
     PSTHDialog *psthDialog;
     SpectrogramDialog *spectrogramDialog;
-    SpikeSortingDialog *spikeSortingDialog;
+    QList<QPointer<SpikeSortingDialog>> spikeSortingDialogs;
+    int nextSpikeScopeNumber;
 
     QMenu *fileMenu;
     QMenu *displayMenu;
@@ -353,6 +354,9 @@ private:
     void initiateSweep(double speed);
 
     void adjustYScale(int delta);
+
+    void pruneSpikeSortingDialogs();
+    void closeSpikeSortingDialogs();
 
     bool stimParamWarning();
     bool overwriteWarning();

@@ -33,9 +33,10 @@
 #include "rhxglobals.h"
 #include "spikeplot.h"
 
-SpikePlot::SpikePlot(SystemState* state_, QWidget *parent) :
+SpikePlot::SpikePlot(SystemState* state_, SpikeScopeViewState* viewState_, QWidget *parent) :
     QWidget(parent),
     state(state_),
+    viewState(viewState_),
     channel(nullptr),
     history(nullptr)
 {
@@ -72,11 +73,6 @@ SpikePlot::~SpikePlot()
 void SpikePlot::setWaveform(const std::string& waveName)
 {
     channel = state->signalSources->channelByName(waveName);
-    if (channel) {
-        state->spikeScopeChannel->setValue(QString::fromStdString(waveName));
-    } else {
-        state->spikeScopeChannel->setValue("N/A");
-    }
 
     std::map<std::string, SpikePlotHistory*>::const_iterator it = spikeHistoryMap.find(waveName);
     if (it == spikeHistoryMap.end()) {  // If data structure for this waveform does not already exist...
@@ -136,10 +132,10 @@ void SpikePlot::paintEvent(QPaintEvent * /* event */)
     int snippetLength = samplesPreDetect + samplesPostDetect;
     QPointF *polyline = new QPointF[snippetLength];
 
-    double tScale = state->tScaleSpikeScope->getNumericValue();
+    double tScale = viewState->timeScaleMilliseconds;
 
     if (history) {
-        bool showArtifacts = state->artifactsShown->getValue();
+        bool showArtifacts = viewState->showArtifacts;
 
         // Draw snapshot waveforms, if any exist.
         painter.setPen(SnapshotColor);
@@ -311,15 +307,15 @@ void SpikePlot::wheelEvent(QWheelEvent* event)
 
     if (!shiftHeld && !controlHeld) {
         if (delta > 0) {
-            state->yScaleSpikeScope->decrementIndex();
+            emit zoomInVoltageRequested();
         } else if (delta < 0) {
-            state->yScaleSpikeScope->incrementIndex();
+            emit zoomOutVoltageRequested();
         }
     } else if (shiftHeld && !controlHeld) {
         if (delta > 0) {
-            state->tScaleSpikeScope->decrementIndex();
+            emit zoomInTimeRequested();
         } else if (delta < 0) {
-            state->tScaleSpikeScope->incrementIndex();
+            emit zoomOutTimeRequested();
         }
     } else if (!shiftHeld && controlHeld) {
         int threshold = 0;
@@ -345,22 +341,22 @@ void SpikePlot::keyPressEvent(QKeyEvent* event)
 
         case Qt::Key_Comma:
         case Qt::Key_Less:
-            state->tScaleSpikeScope->decrementIndex();
+            emit zoomInTimeRequested();
             break;
 
         case Qt::Key_Period:
         case Qt::Key_Greater:
-            state->tScaleSpikeScope->incrementIndex();
+            emit zoomOutTimeRequested();
             break;
 
         case Qt::Key_Minus:
         case Qt::Key_Underscore:
-            state->yScaleSpikeScope->incrementIndex();
+            emit zoomOutVoltageRequested();
             break;
 
         case Qt::Key_Plus:
         case Qt::Key_Equal:
-            state->yScaleSpikeScope->decrementIndex();
+            emit zoomInVoltageRequested();
             break;
 
         case Qt::Key_Delete:
@@ -394,8 +390,8 @@ bool SpikePlot::updateWaveforms(WaveformFifo* waveformFifo, int numSamples)
     if (offset > numWordsInMemory) {
         tStart = 0;
     }
-    bool showArtifacts = state->artifactsShown->getValue();
-    int numSpikesDisplayed = (int) state->numSpikesDisplayed->getNumericValue();
+    bool showArtifacts = viewState->showArtifacts;
+    int numSpikesDisplayed = viewState->numberOfSpikes;
     int spikeId;
     for (int t = tStart; t < numSamples - offset; ++t) {
         spikeId = (int) waveformFifo->getDigitalData(WaveformFifo::ReaderDisplay, spikeRaster, t);
@@ -467,8 +463,8 @@ void SpikePlot::clearSnapshot()
 
 void SpikePlot::updateCoordinateTranslator()
 {
-    double tMax = state->tScaleSpikeScope->getNumericValue();
+    double tMax = viewState->timeScaleMilliseconds;
     double tMin = -tMax / 2.0;
-    double vScale = state->yScaleSpikeScope->getNumericValue();
+    double vScale = viewState->voltageScaleMicroVolts;
     ct.set(scopeFrame, tMin, tMax, -vScale, vScale);
 }

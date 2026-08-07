@@ -50,7 +50,8 @@ class SpikeSortingDialog : public QDialog
 {
     Q_OBJECT
 public:
-    SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, QWidget *parent = nullptr);
+    SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, int scopeNumber_,
+                       const QString& initialChannelName, QWidget *parent = nullptr);
     ~SpikeSortingDialog();
 
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -66,32 +67,27 @@ public:
 
 private slots:
     void updateFromState();
-    void setVoltageThreshold(int threshold)
-        { state->signalSources->channelByName(state->spikeScopeChannel->getValue())->setSpikeThreshold(threshold); }
-    void setVoltageScale(int index)
-        { state->yScaleSpikeScope->setIndex(index); }
-    void setTimeScale(int index)
-        { state->tScaleSpikeScope->setIndex(index); }
-    void setNumSpikesDisplayed(int index)
-        { state->numSpikesDisplayed->setIndex(index); }
+    void setVoltageThreshold(int threshold);
+    void setVoltageScale(int index);
+    void setTimeScale(int index);
+    void setNumSpikesDisplayed(int index);
     void loadSpikeSortingParameters();
     void saveSpikeSortingParameters();
     void clearScope() { spikePlot->clearSpikes(); spikePlot->setFocus(); }
     void takeSnapshot() { spikePlot->takeSnapshot(); spikePlot->clearSpikes(); spikePlot->setFocus(); }
     void clearSnapshot() { spikePlot->clearSnapshot(); spikePlot->setFocus(); }
-    void changeCurrentChannel(const QString& nativeChannelName)
-        { state->spikeScopeChannel->setValue(nativeChannelName); }
-    void toggleLock() { updateFromState(); }
+    void changeCurrentChannel(const QString& nativeChannelName);
+    void toggleLock();
     void setToSelected();
     void toggleSuppressionEnabled(bool enabled);
-    void toggleArtifactsShown(bool enabled)
-        { state->artifactsShown->setValue(enabled); }
-    void setSuppressionThreshold()
-        { state->suppressionThreshold->setValue(suppressionThresholdSpinBox->value()); }
+    void toggleArtifactsShown(bool enabled);
+    void setSuppressionThreshold();
 
 private:   
     SystemState* state;
     ControllerInterface* controllerInterface;
+    const int scopeNumber;
+    SpikeScopeViewState viewState;
 
     XMLInterface *spikeSettingsInterface;
 
@@ -130,6 +126,8 @@ private:
 
     SpikePlot *spikePlot;
 
+    void populateScopeComboBoxes();
+    void refreshScopeWidgets();
     void updateTitle();
 };
 

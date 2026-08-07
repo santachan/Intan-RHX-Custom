@@ -32,6 +32,7 @@
 #define CONTROLLERINTERFACE_H
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include "rhxcontroller.h"
 #include "datafilereader.h"
@@ -89,7 +90,8 @@ public:
     void setISIDialog(ISIDialog* isiDialog_) { isiDialog = isiDialog_; }
     void setPSTHDialog(PSTHDialog* psthDialog_) { psthDialog = psthDialog_; }
     void setSpectrogramDialog(SpectrogramDialog* spectrogramDialog_) { spectrogramDialog = spectrogramDialog_; }
-    void setSpikeSortingDialog(SpikeSortingDialog* spikeSortingDialog_) { spikeSortingDialog = spikeSortingDialog_; }
+    void addSpikeSortingDialog(SpikeSortingDialog* spikeSortingDialog_);
+    void clearSpikeSortingDialogs();
 
     QString getCurrentAudioChannel() const { return currentAudioChannel; }
 
@@ -204,7 +206,7 @@ private:
     ISIDialog* isiDialog;
     PSTHDialog* psthDialog;
     SpectrogramDialog* spectrogramDialog;
-    SpikeSortingDialog* spikeSortingDialog;
+    QList<QPointer<SpikeSortingDialog>> spikeSortingDialogs;
 
     AudioThread* audioThread;
     SaveToDiskThread* saveToDiskThread;
@@ -223,6 +225,7 @@ private:
     bool is7310;
 
     void outOfMemoryError(double memRequiredGB);
+    void pruneSpikeSortingDialogs();
 };
 
 #endif // CONTROLLERINTERFACE_H

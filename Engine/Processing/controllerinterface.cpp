@@ -54,7 +54,6 @@ ControllerInterface::ControllerInterface(SystemState* state_, AbstractRHXControl
     isiDialog(nullptr),
     psthDialog(nullptr),
     spectrogramDialog(nullptr),
-    spikeSortingDialog(nullptr),
     audioThread(nullptr),
     saveToDiskThread(nullptr),
     audioEnabled(false),
@@ -180,6 +179,25 @@ ControllerInterface::~ControllerInterface()
     delete usbStreamFifo;
     delete waveformFifo;
     delete xpuController;
+}
+
+void ControllerInterface::addSpikeSortingDialog(SpikeSortingDialog* spikeSortingDialog_)
+{
+    if (spikeSortingDialog_) spikeSortingDialogs.append(spikeSortingDialog_);
+}
+
+void ControllerInterface::clearSpikeSortingDialogs()
+{
+    spikeSortingDialogs.clear();
+}
+
+void ControllerInterface::pruneSpikeSortingDialogs()
+{
+    for (int i = spikeSortingDialogs.size() - 1; i >= 0; --i) {
+        if (spikeSortingDialogs.at(i).isNull()) {
+            spikeSortingDialogs.removeAt(i);
+        }
+    }
 }
 
 void ControllerInterface::outOfMemoryError(double memRequiredGB)
@@ -904,7 +922,10 @@ void ControllerInterface::runController()
             if (isiDialog) isiDialog->updateISI(waveformFifo, numSamples);
             if (psthDialog) psthDialog->updatePSTH(waveformFifo, numSamples);
             if (spectrogramDialog) spectrogramDialog->updateSpectrogram(waveformFifo, numSamples);
-            if (spikeSortingDialog) spikeSortingDialog->updateSpikeScope(waveformFifo, numSamples);
+            pruneSpikeSortingDialogs();
+            for (const auto& dialog : spikeSortingDialogs) {
+                if (dialog) dialog->updateSpikeScope(waveformFifo, numSamples);
+            }
 
             waveformFifo->freeOldData(WaveformFifo::ReaderDisplay);
 

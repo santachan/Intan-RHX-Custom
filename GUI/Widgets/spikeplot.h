@@ -51,12 +51,24 @@ struct SpikePlotHistory
     std::deque<int> snapshotSpikeIds;
 };
 
+// Display state belongs to one Spike Scope window.  It deliberately does not
+// live in SystemState: several scopes may be open with different channels and
+// view settings while sharing the same acquisition engine.
+struct SpikeScopeViewState
+{
+    QString channelName;
+    double voltageScaleMicroVolts = 500.0;
+    double timeScaleMilliseconds = 2.0;
+    int numberOfSpikes = 20;
+    bool showArtifacts = true;
+};
+
 
 class SpikePlot : public QWidget
 {
     Q_OBJECT
 public:
-    explicit SpikePlot(SystemState* state_, QWidget *parent = nullptr);
+    explicit SpikePlot(SystemState* state_, SpikeScopeViewState* viewState_, QWidget *parent = nullptr);
     ~SpikePlot();
 
     void setWaveform(const std::string& waveName);
@@ -69,6 +81,12 @@ public:
 
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
+
+signals:
+    void zoomInVoltageRequested();
+    void zoomOutVoltageRequested();
+    void zoomInTimeRequested();
+    void zoomOutTimeRequested();
 
 public slots:
     void updateFromState();
@@ -83,6 +101,7 @@ protected:
 
 private:
     SystemState* state;
+    SpikeScopeViewState* viewState;
     Channel* channel;
     SpikePlotHistory* history;
     int samplesPreDetect;
