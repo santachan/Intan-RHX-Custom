@@ -43,15 +43,19 @@ class QSpinBox;
 class QPushButton;
 class QCheckBox;
 class QTabWidget;
+class QMoveEvent;
+class QResizeEvent;
 class WaveformFifo;
 class ControllerInterface;
+class SpikeScopeDockManager;
 
 class SpikeSortingDialog : public QDialog
 {
     Q_OBJECT
 public:
     SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, int scopeNumber_,
-                       const QString& initialChannelName, QWidget *parent = nullptr);
+                       const QString& initialChannelName, SpikeScopeDockManager* dockManager_,
+                       QWidget *parent = nullptr);
     ~SpikeSortingDialog();
 
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -64,6 +68,11 @@ public:
 
     void updateSpikeScope(WaveformFifo *waveformFifo, int numSamples);
     void activate();
+    void setDocked(bool docked);
+
+protected:
+    void moveEvent(QMoveEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void updateFromState();
@@ -86,6 +95,7 @@ private slots:
 private:   
     SystemState* state;
     ControllerInterface* controllerInterface;
+    SpikeScopeDockManager* dockManager;
     const int scopeNumber;
     SpikeScopeViewState viewState;
 
@@ -93,6 +103,7 @@ private:
 
     QPushButton *loadSpikeSortingParametersButton;
     QPushButton *saveSpikeSortingParametersButton;
+    QPushButton *detachButton;
 
     QLabel *channelName;
 

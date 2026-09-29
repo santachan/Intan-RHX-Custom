@@ -40,6 +40,7 @@
 #include "referenceselectdialog.h"
 #include "controlwindow.h"
 #include "scrollablemessageboxdialog.h"
+#include "spikescopedockmanager.h"
 
 ControlWindow::ControlWindow(SystemState* state_, CommandParser* parser_, ControllerInterface* controllerInterface_, AbstractRHXController* rhxController_) :
     QMainWindow(nullptr), // Since the parent isn't a QMainWindow but a QDialog, just pass a nullptr
@@ -57,6 +58,7 @@ ControlWindow::ControlWindow(SystemState* state_, CommandParser* parser_, Contro
     isiDialog(nullptr),
     psthDialog(nullptr),
     spectrogramDialog(nullptr),
+    spikeScopeDockManager(new SpikeScopeDockManager),
     nextSpikeScopeNumber(1),
     fileMenu(nullptr),
     displayMenu(nullptr),
@@ -386,6 +388,7 @@ ControlWindow::~ControlWindow()
         delete spectrogramDialog;
     }
     closeSpikeSortingDialogs();
+    delete spikeScopeDockManager;
     if (triggerRecordDialog) {
         triggerRecordDialog->close();
         delete triggerRecordDialog;
@@ -426,13 +429,14 @@ void ControlWindow::pruneSpikeSortingDialogs()
 void ControlWindow::closeSpikeSortingDialogs()
 {
     controllerInterface->clearSpikeSortingDialogs();
-    for (const auto& dialog : spikeSortingDialogs) {
+    const QList<QPointer<SpikeSortingDialog>> dialogsToClose = spikeSortingDialogs;
+    spikeSortingDialogs.clear();
+    for (const auto& dialog : dialogsToClose) {
         if (dialog) {
             dialog->setAttribute(Qt::WA_DeleteOnClose, false);
             delete dialog;
         }
     }
-    spikeSortingDialogs.clear();
 }
 
 void ControlWindow::dragEnterEvent(QDragEnterEvent *event)
@@ -1294,9 +1298,11 @@ void ControlWindow::spikeSorting()
     QString initialChannel = state->signalSources->singleSelectedAmplifierChannelName();
     if (initialChannel.isEmpty()) initialChannel = state->signalSources->firstChannelName();
 
-    auto *dialog = new SpikeSortingDialog(state, controllerInterface, nextSpikeScopeNumber++, initialChannel, this);
+    auto *dialog = new SpikeSortingDialog(state, controllerInterface, nextSpikeScopeNumber++, initialChannel,
+                                          spikeScopeDockManager, this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     spikeSortingDialogs.append(dialog);
+    spikeScopeDockManager->registerWindow(dialog);
     controllerInterface->addSpikeSortingDialog(dialog);
     connect(dialog, &QObject::destroyed, this, [this](QObject*) { pruneSpikeSortingDialogs(); });
     dialog->activate();

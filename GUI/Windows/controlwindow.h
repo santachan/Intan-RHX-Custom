@@ -58,6 +58,7 @@
 #include "statusbars.h"
 
 class QPushButton;
+class SpikeScopeDockManager;
 
 class ControlWindow : public QMainWindow
 {
@@ -219,6 +220,7 @@ private:
     ISIDialog *isiDialog;
     PSTHDialog *psthDialog;
     SpectrogramDialog *spectrogramDialog;
+    SpikeScopeDockManager *spikeScopeDockManager;
     QList<QPointer<SpikeSortingDialog>> spikeSortingDialogs;
     int nextSpikeScopeNumber;
 

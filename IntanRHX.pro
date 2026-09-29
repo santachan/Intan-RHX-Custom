@@ -97,6 +97,7 @@ SOURCES += main.cpp \
     GUI/Dialogs/setfileformatdialog.cpp \
     GUI/Dialogs/setthresholdsdialog.cpp \
     GUI/Dialogs/spectrogramdialog.cpp \
+    GUI/Dialogs/spikescopedockmanager.cpp \
     GUI/Dialogs/spikesortingdialog.cpp \
     GUI/Dialogs/startupdialog.cpp \
     GUI/Dialogs/stimparamdialog.cpp \
@@ -217,6 +218,7 @@ HEADERS += \
     GUI/Dialogs/setfileformatdialog.h \
     GUI/Dialogs/setthresholdsdialog.h \
     GUI/Dialogs/spectrogramdialog.h \
+    GUI/Dialogs/spikescopedockmanager.h \
     GUI/Dialogs/spikesortingdialog.h \
     GUI/Dialogs/startupdialog.h \
     GUI/Dialogs/stimparamdialog.h \

@@ -30,13 +30,18 @@
 
 #include <QtWidgets>
 #include <QSettings>
+#include <QMoveEvent>
+#include <QResizeEvent>
+#include "spikescopedockmanager.h"
 #include "spikesortingdialog.h"
 
 SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface* controllerInterface_, int scopeNumber_,
-                                        const QString& initialChannelName, QWidget *parent) :
+                                        const QString& initialChannelName, SpikeScopeDockManager* dockManager_,
+                                        QWidget *parent) :
     QDialog(parent),
     state(state_),
     controllerInterface(controllerInterface_),
+    dockManager(dockManager_),
     scopeNumber(scopeNumber_)
 {
     viewState.channelName = initialChannelName;
@@ -164,6 +169,13 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     saveSpikeSortingParametersButton = new QPushButton(tr("Save Detection Parameters"), this);
     connect(saveSpikeSortingParametersButton, SIGNAL(clicked(bool)), this, SLOT(saveSpikeSortingParameters()));
 
+    detachButton = new QPushButton(tr("Detach"), this);
+    detachButton->setEnabled(false);
+    detachButton->setToolTip(tr("Detach this Spike Scope from its window group"));
+    connect(detachButton, &QPushButton::clicked, this, [this]() {
+        if (dockManager) dockManager->detachWindow(this);
+    });
+
     spikePlot = new SpikePlot(state, &viewState, this);
     connect(spikePlot, &SpikePlot::zoomInVoltageRequested, this, [this]() {
         voltageScaleComboBox->setCurrentIndex(qMax(0, voltageScaleComboBox->currentIndex() - 1));
@@ -244,6 +256,7 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
 //    leftColumn->addWidget(hoopSpikeSortingBox);
 //    leftColumn->addWidget(unitTabWidget);
     leftColumn->addStretch();
+    leftColumn->addWidget(detachButton);
     leftColumn->addWidget(loadSpikeSortingParametersButton);
     leftColumn->addWidget(saveSpikeSortingParametersButton);
 
@@ -271,8 +284,26 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
 
 SpikeSortingDialog::~SpikeSortingDialog()
 {
+    if (dockManager) dockManager->unregisterWindow(this);
     delete spikeSettingsInterface;
     delete spikePlot;
+}
+
+void SpikeSortingDialog::setDocked(bool docked)
+{
+    detachButton->setEnabled(docked);
+}
+
+void SpikeSortingDialog::moveEvent(QMoveEvent *event)
+{
+    QDialog::moveEvent(event);
+    if (dockManager) dockManager->windowMoved(this, event->oldPos(), event->pos());
+}
+
+void SpikeSortingDialog::resizeEvent(QResizeEvent *event)
+{
+    QDialog::resizeEvent(event);
+    if (dockManager) dockManager->windowResized(this);
 }
 
 void SpikeSortingDialog::dragEnterEvent(QDragEnterEvent *event)
