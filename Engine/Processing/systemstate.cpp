@@ -245,7 +245,7 @@ SystemState::SystemState(const AbstractRHXController* controller_, StimStepSize 
     writeToLog("Created saving data variables");
 
     // TCP
-    tcpNumDataBlocksWrite = new IntRangeItem("TCPNumberDataBlocksPerWrite", globalItems, this, 1, 100, 10, XMLGroupNone);
+    tcpNumDataBlocksWrite = new IntRangeItem("TCPNumberDataBlocksPerWrite", globalItems, this, 1, 100, 2, XMLGroupNone);
     tcpNumDataBlocksWrite->setRestricted(RestrictIfRunning, RunningErrorMessage);
 
     writeToLog("Created TCP variables");
