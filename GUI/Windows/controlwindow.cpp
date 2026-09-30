@@ -29,6 +29,7 @@
 //------------------------------------------------------------------------------
 
 #include <QSettings>
+#include <QTimer>
 #include <QtMultimedia>
 #include "setthresholdsdialog.h"
 #include "autocolordialog.h"
@@ -142,6 +143,8 @@ ControlWindow::ControlWindow(SystemState* state_, CommandParser* parser_, Contro
     showHideRow(nullptr),
     showHideStretch(nullptr),
     stimClipboard(nullptr),
+    closeRequested(false),
+    controllerOperationInProgress(false),
     currentlyRunning(false),
     currentlyRecording(false),
     fastPlaybackMode(false),
@@ -838,6 +841,10 @@ void ControlWindow::createStatusBar()
 
 void ControlWindow::updateFromState()
 {
+    if (state->running && !currentlyRunning) {
+        controllerOperationInProgress = true;
+    }
+
     // Update menus.
     updateMenus();
 
@@ -1109,10 +1116,16 @@ QString ControlWindow::getDisplaySettingsString()
 
 void ControlWindow::stopAndReportAnyErrors()
 {
+    controllerOperationInProgress = false;
     updateForStop();
     if (!queuedErrorMessage.isEmpty()) {
         QMessageBox::critical(this, tr("Error"), queuedErrorMessage);
         queuedErrorMessage.clear();
+    }
+
+    if (closeRequested) {
+        closeRequested = false;
+        QTimer::singleShot(0, this, &QWidget::close);
     }
 }
 
@@ -1422,6 +1435,7 @@ void ControlWindow::initiateSweep(double speed)
     }
     runAction->setEnabled(false);
     stopAction->setEnabled(true);
+    controllerOperationInProgress = true;
     state->sweeping = true;
     state->forceUpdate();
     controllerInterface->sweepDisplay(speed);
@@ -1701,9 +1715,21 @@ void ControlWindow::keyReleaseEvent(QKeyEvent *event)
 
 void ControlWindow::closeEvent(QCloseEvent *event)
 {
-    // Perform any clean-up here before application closes.
-    if (state->running)
-        emit sendSetCommand("RunMode", "Stop");
+    // runController() and sweepDisplay() process GUI events from synchronous loops.  If this
+    // window is deleted from one of those nested event loops, they resume with dangling display
+    // pointers.  Keep the window alive until ControllerInterface emits haveStopped().
+    if (state->running || state->sweeping || controllerOperationInProgress) {
+        closeRequested = true;
+        event->ignore();
+
+        if (state->sweeping) {
+            state->sweeping = false;
+        }
+        if (state->running) {
+            emit sendSetCommand("RunMode", "Stop");
+        }
+        return;
+    }
 
     event->accept();
 }

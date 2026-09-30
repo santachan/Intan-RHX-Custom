@@ -49,7 +49,7 @@ void SpikeScopeDockManager::registerWindow(SpikeSortingDialog* window)
     }
 
     windows.append(window);
-    updateDetachButtons();
+    updateWindowChrome();
 }
 
 void SpikeScopeDockManager::unregisterWindow(SpikeSortingDialog* window)
@@ -67,7 +67,7 @@ void SpikeScopeDockManager::unregisterWindow(SpikeSortingDialog* window)
         }
     }
     snapSuppressedWindows.remove(window);
-    updateDetachButtons();
+    updateWindowChrome();
 }
 
 void SpikeScopeDockManager::detachWindow(SpikeSortingDialog* window)
@@ -83,7 +83,18 @@ void SpikeScopeDockManager::detachWindow(SpikeSortingDialog* window)
 
     // Do not immediately re-snap while the user is dragging a just-detached window away.
     snapSuppressedWindows.insert(window);
-    updateDetachButtons();
+    updateWindowChrome();
+}
+
+void SpikeScopeDockManager::clearScopesInGroup(SpikeSortingDialog* window)
+{
+    if (!window) return;
+
+    prune();
+    const QList<SpikeSortingDialog*> component = connectedComponent(window);
+    for (SpikeSortingDialog* groupedWindow : component) {
+        if (groupedWindow) groupedWindow->clearScopeDisplay();
+    }
 }
 
 void SpikeScopeDockManager::windowMoved(SpikeSortingDialog* window, const QPoint& oldPosition, const QPoint& newPosition)
@@ -106,7 +117,6 @@ void SpikeScopeDockManager::windowMoved(SpikeSortingDialog* window, const QPoint
 
     moveComponent(component, candidate.translation);
     addLink(candidate.targetWindow, candidate.movingWindow, candidate.movingSideOfTarget);
-    updateDetachButtons();
 }
 
 void SpikeScopeDockManager::windowResized(SpikeSortingDialog* window)
@@ -165,10 +175,37 @@ bool SpikeScopeDockManager::directlyDocked(SpikeSortingDialog* window) const
     return false;
 }
 
-void SpikeScopeDockManager::updateDetachButtons()
+void SpikeScopeDockManager::updateWindowChrome(SpikeSortingDialog* preferredPanelOwner)
 {
-    for (const auto& window : windows) {
-        if (window) window->setDocked(directlyDocked(window));
+    QSet<SpikeSortingDialog*> visited;
+
+    for (const auto& windowPointer : windows) {
+        SpikeSortingDialog* window = windowPointer;
+        if (!window || visited.contains(window)) continue;
+
+        const QList<SpikeSortingDialog*> component = connectedComponent(window);
+        for (SpikeSortingDialog* groupedWindow : component) visited.insert(groupedWindow);
+
+        const bool docked = component.size() > 1;
+        SpikeSortingDialog* panelOwner = nullptr;
+        if (docked && preferredPanelOwner && component.contains(preferredPanelOwner)) {
+            panelOwner = preferredPanelOwner;
+        }
+        if (docked && !panelOwner) {
+            for (SpikeSortingDialog* groupedWindow : component) {
+                if (groupedWindow && groupedWindow->isControlPanelVisible()) {
+                    panelOwner = groupedWindow;
+                    break;
+                }
+            }
+        }
+        if (docked && !panelOwner && !component.isEmpty()) panelOwner = component.first();
+
+        for (SpikeSortingDialog* groupedWindow : component) {
+            if (!groupedWindow) continue;
+            groupedWindow->setDocked(docked);
+            groupedWindow->setControlPanelVisible(!docked || groupedWindow == panelOwner);
+        }
     }
 }
 
@@ -303,11 +340,21 @@ void SpikeScopeDockManager::addLink(SpikeSortingDialog* targetWindow, SpikeSorti
 {
     if (!targetWindow || !movingWindow || targetWindow == movingWindow) return;
 
+    SpikeSortingDialog* preferredPanelOwner = targetWindow;
+    const QList<SpikeSortingDialog*> targetComponent = connectedComponent(targetWindow);
+    for (SpikeSortingDialog* groupedWindow : targetComponent) {
+        if (groupedWindow && groupedWindow->isControlPanelVisible()) {
+            preferredPanelOwner = groupedWindow;
+            break;
+        }
+    }
+
     DockLink link;
     link.first = targetWindow;
     link.second = movingWindow;
     link.secondSideOfFirst = movingSideOfTarget;
     links.append(link);
+    updateWindowChrome(preferredPanelOwner);
 }
 
 bool SpikeScopeDockManager::shouldReleaseSnapSuppression(SpikeSortingDialog* window) const

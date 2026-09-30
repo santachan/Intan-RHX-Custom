@@ -69,6 +69,9 @@ public:
     void updateSpikeScope(WaveformFifo *waveformFifo, int numSamples);
     void activate();
     void setDocked(bool docked);
+    void setControlPanelVisible(bool visible);
+    bool isControlPanelVisible() const { return controlPanelVisible; }
+    void clearScopeDisplay();
 
 protected:
     void moveEvent(QMoveEvent *event) override;
@@ -82,7 +85,7 @@ private slots:
     void setNumSpikesDisplayed(int index);
     void loadSpikeSortingParameters();
     void saveSpikeSortingParameters();
-    void clearScope() { spikePlot->clearSpikes(); spikePlot->setFocus(); }
+    void clearScope();
     void takeSnapshot() { spikePlot->takeSnapshot(); spikePlot->clearSpikes(); spikePlot->setFocus(); }
     void clearSnapshot() { spikePlot->clearSnapshot(); spikePlot->setFocus(); }
     void changeCurrentChannel(const QString& nativeChannelName);
@@ -104,6 +107,8 @@ private:
     QPushButton *loadSpikeSortingParametersButton;
     QPushButton *saveSpikeSortingParametersButton;
     QPushButton *detachButton;
+    QWidget *controlPanelWidget;
+    bool controlPanelVisible;
 
     QLabel *channelName;
 

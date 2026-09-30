@@ -42,7 +42,9 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     state(state_),
     controllerInterface(controllerInterface_),
     dockManager(dockManager_),
-    scopeNumber(scopeNumber_)
+    scopeNumber(scopeNumber_),
+    controlPanelWidget(nullptr),
+    controlPanelVisible(true)
 {
     viewState.channelName = initialChannelName;
     viewState.voltageScaleMicroVolts = state->yScaleSpikeScope->getNumericValue();
@@ -170,7 +172,7 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     connect(saveSpikeSortingParametersButton, SIGNAL(clicked(bool)), this, SLOT(saveSpikeSortingParameters()));
 
     detachButton = new QPushButton(tr("Detach"), this);
-    detachButton->setEnabled(false);
+    detachButton->setVisible(false);
     detachButton->setToolTip(tr("Detach this Spike Scope from its window group"));
     connect(detachButton, &QPushButton::clicked, this, [this]() {
         if (dockManager) dockManager->detachWindow(this);
@@ -256,15 +258,22 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
 //    leftColumn->addWidget(hoopSpikeSortingBox);
 //    leftColumn->addWidget(unitTabWidget);
     leftColumn->addStretch();
-    leftColumn->addWidget(detachButton);
     leftColumn->addWidget(loadSpikeSortingParametersButton);
     leftColumn->addWidget(saveSpikeSortingParametersButton);
 
+    controlPanelWidget = new QWidget(this);
+    controlPanelWidget->setLayout(leftColumn);
+
+    QHBoxLayout *dockedWindowRow = new QHBoxLayout;
+    dockedWindowRow->addStretch(1);
+    dockedWindowRow->addWidget(detachButton);
+
     QVBoxLayout *rightColumn = new QVBoxLayout;
+    rightColumn->addLayout(dockedWindowRow);
     rightColumn->addWidget(spikePlot);
 
     QHBoxLayout *mainLayout = new QHBoxLayout;
-    mainLayout->addLayout(leftColumn);
+    mainLayout->addWidget(controlPanelWidget);
     mainLayout->addLayout(rightColumn);
     mainLayout->setStretch(0, 0);
     mainLayout->setStretch(1, 1);
@@ -291,7 +300,26 @@ SpikeSortingDialog::~SpikeSortingDialog()
 
 void SpikeSortingDialog::setDocked(bool docked)
 {
+    detachButton->setVisible(docked);
     detachButton->setEnabled(docked);
+}
+
+void SpikeSortingDialog::setControlPanelVisible(bool visible)
+{
+    controlPanelVisible = visible;
+    if (controlPanelWidget) controlPanelWidget->setVisible(visible);
+}
+
+void SpikeSortingDialog::clearScopeDisplay()
+{
+    spikePlot->clearSpikes();
+}
+
+void SpikeSortingDialog::clearScope()
+{
+    if (dockManager) dockManager->clearScopesInGroup(this);
+    else clearScopeDisplay();
+    spikePlot->setFocus();
 }
 
 void SpikeSortingDialog::moveEvent(QMoveEvent *event)

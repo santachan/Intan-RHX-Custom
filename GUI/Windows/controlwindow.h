@@ -331,6 +331,8 @@ private:
     QSoundEffect *minorBufferWarning;
     QSoundEffect *majorBufferWarning;
 
+    bool closeRequested;
+    bool controllerOperationInProgress;
     bool currentlyRunning;
     bool currentlyRecording;
     bool fastPlaybackMode;

@@ -47,6 +47,7 @@ public:
     void registerWindow(SpikeSortingDialog* window);
     void unregisterWindow(SpikeSortingDialog* window);
     void detachWindow(SpikeSortingDialog* window);
+    void clearScopesInGroup(SpikeSortingDialog* window);
 
     void windowMoved(SpikeSortingDialog* window, const QPoint& oldPosition, const QPoint& newPosition);
     void windowResized(SpikeSortingDialog* window);
@@ -83,7 +84,7 @@ private:
     void prune();
     QList<SpikeSortingDialog*> connectedComponent(SpikeSortingDialog* root) const;
     bool directlyDocked(SpikeSortingDialog* window) const;
-    void updateDetachButtons();
+    void updateWindowChrome(SpikeSortingDialog* preferredPanelOwner = nullptr);
 
     void moveComponent(const QList<SpikeSortingDialog*>& component, const QPoint& delta,
                        SpikeSortingDialog* alreadyMoved = nullptr);
