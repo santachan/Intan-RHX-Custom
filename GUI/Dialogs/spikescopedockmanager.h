@@ -93,6 +93,9 @@ private:
 
     SnapCandidate findBestSnap(const QList<SpikeSortingDialog*>& movingComponent) const;
     void addLink(SpikeSortingDialog* targetWindow, SpikeSortingDialog* movingWindow, DockSide movingSideOfTarget);
+    bool sideOccupied(SpikeSortingDialog* window, DockSide side) const;
+    bool componentsWouldOverlap(const QList<SpikeSortingDialog*>& movingComponent,
+                                SpikeSortingDialog* targetWindow, const QPoint& translation) const;
     bool shouldReleaseSnapSuppression(SpikeSortingDialog* window) const;
 
     static DockSide oppositeSide(DockSide side);

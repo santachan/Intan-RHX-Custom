@@ -75,6 +75,7 @@ public:
     QString getWaveform();
     bool updateWaveforms(WaveformFifo* waveformFifo, int numSamples);
     void clearSpikes();
+    void setThresholdEditingEnabled(bool enabled);
 
     void takeSnapshot();
     void clearSnapshot();
@@ -117,6 +118,7 @@ private:
 
     double latestRmsCalculation;
     int latestSpikeRateCalculation;
+    bool thresholdEditingEnabled;
 
     CoordinateTranslator ct;
 

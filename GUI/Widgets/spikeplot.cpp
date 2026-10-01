@@ -38,7 +38,8 @@ SpikePlot::SpikePlot(SystemState* state_, SpikeScopeViewState* viewState_, QWidg
     state(state_),
     viewState(viewState_),
     channel(nullptr),
-    history(nullptr)
+    history(nullptr),
+    thresholdEditingEnabled(true)
 {
     connect(state, SIGNAL(stateChanged()), this, SLOT(updateFromState()));
 
@@ -283,7 +284,7 @@ void SpikePlot::closeEvent(QCloseEvent *event)
 
 void SpikePlot::mousePressEvent(QMouseEvent* event)  // Note: Must setMouseTracking(true) for this to work.
 {
-    if (event->button() == Qt::LeftButton) {
+    if (event->button() == Qt::LeftButton && thresholdEditingEnabled) {
         if (scopeFrame.contains(event->pos())) {
             updateCoordinateTranslator();
             int newThreshold = qRound(ct.realYFromScreenY(event->pos().y()));
@@ -317,7 +318,7 @@ void SpikePlot::wheelEvent(QWheelEvent* event)
         } else if (delta < 0) {
             emit zoomOutTimeRequested();
         }
-    } else if (!shiftHeld && controlHeld) {
+    } else if (!shiftHeld && controlHeld && thresholdEditingEnabled) {
         int threshold = 0;
         if (channel) {
             threshold = channel->getSpikeThreshold();
@@ -443,6 +444,12 @@ void SpikePlot::clearSpikes()
     history->snippets.clear();
     history->spikeIds.clear();
     update();
+}
+
+void SpikePlot::setThresholdEditingEnabled(bool enabled)
+{
+    thresholdEditingEnabled = enabled;
+    setToolTip(enabled ? QString() : tr("Threshold editing is locked while this Spike Scope is docked."));
 }
 
 void SpikePlot::takeSnapshot()

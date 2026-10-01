@@ -109,6 +109,7 @@ private:
     QPushButton *detachButton;
     QWidget *controlPanelWidget;
     bool controlPanelVisible;
+    bool docked;
 
     QLabel *channelName;
 

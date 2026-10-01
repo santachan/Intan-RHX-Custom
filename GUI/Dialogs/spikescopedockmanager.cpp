@@ -308,6 +308,8 @@ SpikeScopeDockManager::SnapCandidate SpikeScopeDockManager::findBestSnap(
 
             for (const SideDistance& sideDistance : distances) {
                 if (!sideDistance.enoughOverlap || sideDistance.distance > snapDistance) continue;
+                if (sideOccupied(targetWindow, sideDistance.side) ||
+                        sideOccupied(movingWindow, oppositeSide(sideDistance.side))) continue;
 
                 QPoint translation = translationForSnap(movingFrame, targetFrame, sideDistance.side);
                 const int maximumAlignmentDistance = snapDistance * 3;
@@ -315,6 +317,7 @@ SpikeScopeDockManager::SnapCandidate SpikeScopeDockManager::findBestSnap(
                         qAbs(translation.y()) > maximumAlignmentDistance) continue;
                 if ((sideDistance.side == DockTop || sideDistance.side == DockBottom) &&
                         qAbs(translation.x()) > maximumAlignmentDistance) continue;
+                if (componentsWouldOverlap(movingComponent, targetWindow, translation)) continue;
 
                 int alignmentPenalty = (sideDistance.side == DockLeft || sideDistance.side == DockRight) ?
                             qAbs(translation.y()) / 4 : qAbs(translation.x()) / 4;
@@ -355,6 +358,32 @@ void SpikeScopeDockManager::addLink(SpikeSortingDialog* targetWindow, SpikeSorti
     link.secondSideOfFirst = movingSideOfTarget;
     links.append(link);
     updateWindowChrome(preferredPanelOwner);
+}
+
+bool SpikeScopeDockManager::sideOccupied(SpikeSortingDialog* window, DockSide side) const
+{
+    if (!window) return false;
+
+    for (const DockLink& link : links) {
+        if (link.first == window && link.secondSideOfFirst == side) return true;
+        if (link.second == window && oppositeSide(link.secondSideOfFirst) == side) return true;
+    }
+    return false;
+}
+
+bool SpikeScopeDockManager::componentsWouldOverlap(
+        const QList<SpikeSortingDialog*>& movingComponent,
+        SpikeSortingDialog* targetWindow, const QPoint& translation) const
+{
+    const QList<SpikeSortingDialog*> targetComponent = connectedComponent(targetWindow);
+    for (SpikeSortingDialog* movingWindow : movingComponent) {
+        if (!movingWindow) continue;
+        const QRect movedFrame = movingWindow->frameGeometry().translated(translation);
+        for (SpikeSortingDialog* existingWindow : targetComponent) {
+            if (existingWindow && movedFrame.intersects(existingWindow->frameGeometry())) return true;
+        }
+    }
+    return false;
 }
 
 bool SpikeScopeDockManager::shouldReleaseSnapSuppression(SpikeSortingDialog* window) const

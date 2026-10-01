@@ -44,7 +44,8 @@ SpikeSortingDialog:: SpikeSortingDialog(SystemState* state_, ControllerInterface
     dockManager(dockManager_),
     scopeNumber(scopeNumber_),
     controlPanelWidget(nullptr),
-    controlPanelVisible(true)
+    controlPanelVisible(true),
+    docked(false)
 {
     viewState.channelName = initialChannelName;
     viewState.voltageScaleMicroVolts = state->yScaleSpikeScope->getNumericValue();
@@ -298,10 +299,18 @@ SpikeSortingDialog::~SpikeSortingDialog()
     delete spikePlot;
 }
 
-void SpikeSortingDialog::setDocked(bool docked)
+void SpikeSortingDialog::setDocked(bool docked_)
 {
+    docked = docked_;
     detachButton->setVisible(docked);
     detachButton->setEnabled(docked);
+    spikePlot->setThresholdEditingEnabled(!docked);
+
+    Channel* channel = state->signalSources->channelByName(viewState.channelName);
+    thresholdSpinBox->setEnabled(!docked && channel != nullptr);
+    thresholdSpinBox->setToolTip(docked ?
+                                     tr("Threshold editing is locked while this Spike Scope is docked.") :
+                                     QString());
 }
 
 void SpikeSortingDialog::setControlPanelVisible(bool visible)
@@ -389,7 +398,7 @@ void SpikeSortingDialog::refreshScopeWidgets()
     channelName->setText(displayName.isEmpty() ? tr("N/A") : displayName);
 
     Channel* channel = state->signalSources->channelByName(viewState.channelName);
-    thresholdSpinBox->setEnabled(channel != nullptr);
+    thresholdSpinBox->setEnabled(!docked && channel != nullptr);
     if (channel && thresholdSpinBox->value() != channel->getSpikeThreshold()) {
         QSignalBlocker blocker(thresholdSpinBox);
         thresholdSpinBox->setValue(channel->getSpikeThreshold());
@@ -440,6 +449,7 @@ void SpikeSortingDialog::updateFromState()
 
 void SpikeSortingDialog::setVoltageThreshold(int threshold)
 {
+    if (docked) return;
     Channel* channel = state->signalSources->channelByName(viewState.channelName);
     if (channel) channel->setSpikeThreshold(threshold);
 }
