@@ -1,0 +1,43 @@
+name: Windows Portable Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/port-a-d-column
+
+jobs:
+  build-windows-portable:
+    name: Windows x64 portable package
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC x64
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.1"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtsvg
+          cache: true
+
+      - name: Build portable package
+        shell: pwsh
+        run: ./contrib/ci/build-windows-portable.ps1
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: IntanRHX-port-a-d-column-Windows-x64
+          path: result/IntanRHX-port-a-d-column-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
