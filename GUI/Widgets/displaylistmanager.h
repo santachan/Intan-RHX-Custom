@@ -90,6 +90,7 @@ public:
 
     // These functions update the system state intelligently, and automatically trigger a state change if anything changed.
     void updateOrderInState(const QString& portName, int numFiltersDisplayed, bool arrangeByFilter);
+    void updateOrderInState(const QStringList& portNames, int numFiltersDisplayed, bool arrangeByFilter);
 
 private:
     QList<DisplayedWaveform>& displayList;

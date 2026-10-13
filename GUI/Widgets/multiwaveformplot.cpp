@@ -176,11 +176,24 @@ void MultiWaveformPlot::updateFromState()
     }
 
 
-    QString selectedPort = parent->getSelectedPort();
-    QStringList displayWaveforms = state->signalSources->getDisplayListAmplifiers(selectedPort);
-    QStringList auxInputWaveforms = state->signalSources->getDisplayListAuxInputs(selectedPort);
-    QStringList supplyVoltageWaveforms = state->signalSources->getDisplayListSupplyVoltages(selectedPort);
-    QStringList baseWaveforms = state->signalSources->getDisplayListBaseGroup(selectedPort);
+    QStringList displayWaveforms;
+    QStringList auxInputWaveforms;
+    QStringList supplyVoltageWaveforms;
+    QStringList baseWaveforms;
+
+    const auto appendPortWaveforms = [](QStringList& destination, const QStringList& source) {
+        if (source.isEmpty()) return;
+        if (!destination.isEmpty() && destination.last() != "/") destination.append("/");
+        destination.append(source);
+    };
+
+    const QStringList selectedPorts = parent->getSelectedPorts();
+    for (const QString& portName : selectedPorts) {
+        appendPortWaveforms(displayWaveforms, state->signalSources->getDisplayListAmplifiers(portName));
+        appendPortWaveforms(auxInputWaveforms, state->signalSources->getDisplayListAuxInputs(portName));
+        appendPortWaveforms(supplyVoltageWaveforms, state->signalSources->getDisplayListSupplyVoltages(portName));
+        appendPortWaveforms(baseWaveforms, state->signalSources->getDisplayListBaseGroup(portName));
+    }
 
     listManager->populateDisplayList(displayWaveforms, auxInputWaveforms, supplyVoltageWaveforms, baseWaveforms);
 
@@ -898,7 +911,7 @@ void MultiWaveformPlot::mouseMoveEvent(QMouseEvent* event)
         } else if (regionAboveLabels.contains(event->pos()) || hoverWaveIndex.inPinned) {
             scrollBar->scroll(-scrollBar->getStepSize());
         }
-    } else if (!dragState.dragging && event->buttons() & Qt::LeftButton) {
+    } else if (!dragState.dragging && !parent->isCombinedPortSelection() && event->buttons() & Qt::LeftButton) {
         if (regionLabels[state->labelWidth->getIndex()].contains(event->pos()) && !outOfBoundsClick) {
             // Start dragging.
             WaveIndex clickedWaveform = findSelectedWaveform(event->pos().y());
@@ -1041,7 +1054,7 @@ void MultiWaveformPlot::mouseReleaseEvent(QMouseEvent* event)
                 }
             }
             if (needToUpdateState) {
-                listManager->updateOrderInState(parent->getSelectedPort(), numFiltersDisplayed, arrangeByFilter);
+                listManager->updateOrderInState(parent->getSelectedPorts(), numFiltersDisplayed, arrangeByFilter);
             }
         }
     } else if (regionLabels[state->labelWidth->getIndex()].contains(dropPoint) ||
@@ -1179,7 +1192,7 @@ void MultiWaveformPlot::group()
 {
     state->signalSources->undoManager->pushStateToUndoStack();
     if (listManager->groupSelectedWaveforms(true, numFiltersDisplayed, arrangeByFilter)) {
-        listManager->updateOrderInState(parent->getSelectedPort(), numFiltersDisplayed, arrangeByFilter);
+        listManager->updateOrderInState(parent->getSelectedPorts(), numFiltersDisplayed, arrangeByFilter);
     }
     state->forceUpdate();
 }

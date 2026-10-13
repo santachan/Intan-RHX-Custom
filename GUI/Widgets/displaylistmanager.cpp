@@ -842,6 +842,58 @@ void DisplayListManager::updateOrderInState(const QString& portName, int numFilt
             }
         }
     }
+}
+
+void DisplayListManager::updateOrderInState(const QStringList& portNames, int numFiltersDisplayed, bool arrangeByFilter)
+{
+    if (portNames.size() == 1) {
+        updateOrderInState(portNames.first(), numFiltersDisplayed, arrangeByFilter);
+        return;
+    }
+
+    Q_UNUSED(numFiltersDisplayed)
+    Q_UNUSED(arrangeByFilter)
+
+    for (const QString& portName : portNames) {
+        SignalGroup* group = state->signalSources->groupByName(portName);
+        if (!group) {
+            std::cerr << "DisplayListManager::updateOrderInState: Signal group not found: "
+                      << portName.toStdString() << '\n';
+            continue;
+        }
+
+        const int numAmplifierChannels = group->numChannels(AmplifierSignal);
+        const int numAuxInputChannels = group->numChannels(AuxInputSignal);
+        int amplifierOrder = 0;
+        int auxInputOrder = numAmplifierChannels;
+        int supplyVoltageOrder = numAmplifierChannels + numAuxInputChannels;
+        int otherOrder = 0;
+        QSet<QString> channelsAlreadyOrdered;
+
+        for (const DisplayedWaveform& waveform : displayList) {
+            Channel* channel = waveform.channel;
+            if (!channel || channel->getGroupName() != portName) continue;
+
+            const QString channelName = channel->getNativeName();
+            if (channelsAlreadyOrdered.contains(channelName)) continue;
+            channelsAlreadyOrdered.insert(channelName);
+
+            switch (channel->getSignalType()) {
+            case AmplifierSignal:
+                channel->setUserOrder(amplifierOrder++);
+                break;
+            case AuxInputSignal:
+                channel->setUserOrder(auxInputOrder++);
+                break;
+            case SupplyVoltageSignal:
+                channel->setUserOrder(supplyVoltageOrder++);
+                break;
+            default:
+                channel->setUserOrder(otherOrder++);
+                break;
+            }
+        }
+    }
     // Note: Any function calling this function should also call state->forceUpdate().
 }
 

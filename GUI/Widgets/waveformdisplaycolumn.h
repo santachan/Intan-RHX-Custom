@@ -66,7 +66,9 @@ public:
     inline void loadWaveformDataDirect(QVector<QVector<QVector<double>>> &ampData, QVector<QVector<QString>> &ampChannelNames, QVector<QVector<double>> &auxInData)
         { waveformPlot->loadWaveformDataDirect(ampData, ampChannelNames, auxInData); }
 
-    QString getSelectedPort() const { return portComboBox->currentText().section(" (", 0, 0); }
+    QString getSelectedPort() const;
+    QStringList getSelectedPorts() const;
+    bool isCombinedPortSelection() const;
     void setSelectedPort(const QString& portName);
     int numPorts() const { return portComboBox->count(); }
     int currentPortIndex() const { return portComboBox->currentIndex(); }
@@ -132,6 +134,8 @@ private:
     QCheckBox* showPinnedCheckBox;
 
     QSpacerItem* verticalSpacer;
+
+    void populatePortComboBox();
 };
 
 #endif // WAVEFORMDISPLAYCOLUMN_H

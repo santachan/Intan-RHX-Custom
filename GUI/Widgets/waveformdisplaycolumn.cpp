@@ -32,6 +32,15 @@
 #include "multicolumndisplay.h"
 #include "waveformdisplaycolumn.h"
 
+namespace {
+const QString CombinedPortsPrefix = QStringLiteral("Combined Ports A-");
+
+QString combinedPortsId(const QString& lastPortLetter)
+{
+    return CombinedPortsPrefix + lastPortLetter;
+}
+}
+
 WaveformDisplayColumn::WaveformDisplayColumn(int columnIndex_, WaveformDisplayManager* waveformManager,
                                              ControllerInterface* controllerInterface_, SystemState *state_,
                                              MultiColumnDisplay *parent_) :
@@ -49,7 +58,7 @@ WaveformDisplayColumn::WaveformDisplayColumn(int columnIndex_, WaveformDisplayMa
     pinnedShown = true;
 
     portComboBox = new QComboBox(this);
-    portComboBox->addItems(state->signalSources->populatedGroupListWithChannelCounts());
+    populatePortComboBox();
 
     waveformPlot = new MultiWaveformPlot(columnIndex, waveformManager, controllerInterface, state, this);
     connect(portComboBox, SIGNAL(currentIndexChanged(int)), waveformPlot, SLOT(updateFromState()));
@@ -229,9 +238,86 @@ void WaveformDisplayColumn::showColumn()
 void WaveformDisplayColumn::setSelectedPort(const QString& portName)
 {
     for (int i = 0; i < portComboBox->count(); ++i) {
-        if (portComboBox->itemText(i).section(" (", 0, 0) == portName) {
+        if (portComboBox->itemData(i).toString() == portName ||
+                portComboBox->itemText(i).section(" (", 0, 0) == portName) {
             portComboBox->setCurrentIndex(i);
             break;
+        }
+    }
+}
+
+QString WaveformDisplayColumn::getSelectedPort() const
+{
+    QString selectedPort = portComboBox->currentData().toString();
+    if (selectedPort.isEmpty()) {
+        selectedPort = portComboBox->currentText().section(" (", 0, 0);
+    }
+    return selectedPort;
+}
+
+QStringList WaveformDisplayColumn::getSelectedPorts() const
+{
+    if (!isCombinedPortSelection()) {
+        return QStringList({getSelectedPort()});
+    }
+
+    const QString selectedPort = getSelectedPort();
+    const QStringList combinedPorts = {QStringLiteral("Port A"), QStringLiteral("Port B"),
+                                       QStringLiteral("Port C"), QStringLiteral("Port D")};
+    const QString lastPortLetter = selectedPort.right(1);
+    const int lastPortIndex = combinedPorts.indexOf(QStringLiteral("Port ") + lastPortLetter);
+    if (lastPortIndex < 1) {
+        return QStringList();
+    }
+    return combinedPorts.mid(0, lastPortIndex + 1);
+}
+
+bool WaveformDisplayColumn::isCombinedPortSelection() const
+{
+    return getSelectedPort().startsWith(CombinedPortsPrefix);
+}
+
+void WaveformDisplayColumn::populatePortComboBox()
+{
+    const QStringList combinedPorts = {QStringLiteral("Port A"), QStringLiteral("Port B"),
+                                       QStringLiteral("Port C"), QStringLiteral("Port D")};
+    QList<int> amplifierChannelCounts(combinedPorts.size(), 0);
+
+    for (int i = 0; i < state->signalSources->numPortGroups(); ++i) {
+        const SignalGroup* group = state->signalSources->portGroupByIndex(i);
+        if (group->numChannels() == 0) continue;
+
+        const QString groupName = group->getName();
+        portComboBox->addItem(groupName + " (" + QString::number(group->numChannels(AmplifierSignal)) + " ch)",
+                              groupName);
+        const int amplifierChannelCount = group->numChannels(AmplifierSignal);
+        const int combinedPortIndex = combinedPorts.indexOf(groupName);
+        if (combinedPortIndex >= 0) {
+            amplifierChannelCounts[combinedPortIndex] = amplifierChannelCount;
+        }
+    }
+
+    int combinedChannelCount = amplifierChannelCounts.at(0);
+    for (int lastPortIndex = 1; lastPortIndex < combinedPorts.size(); ++lastPortIndex) {
+        if (combinedChannelCount == 0 || amplifierChannelCounts.at(lastPortIndex) == 0) {
+            break;
+        }
+        combinedChannelCount += amplifierChannelCounts.at(lastPortIndex);
+        const QString lastPortLetter = combinedPorts.at(lastPortIndex).right(1);
+        portComboBox->addItem(tr("Ports A-%1 combined (%2 ch)")
+                              .arg(lastPortLetter).arg(combinedChannelCount),
+                              combinedPortsId(lastPortLetter));
+        const int combinedIndex = portComboBox->count() - 1;
+        portComboBox->setItemData(combinedIndex,
+                                  tr("Display every amplifier channel from Ports A through %1 in this column.")
+                                  .arg(lastPortLetter),
+                                  Qt::ToolTipRole);
+    }
+
+    for (int i = 0; i < state->signalSources->numBaseGroups(); ++i) {
+        const SignalGroup* group = state->signalSources->baseGroupByIndex(i);
+        if (group->numChannels() > 0) {
+            portComboBox->addItem(group->getName(), group->getName());
         }
     }
 }
@@ -285,15 +371,13 @@ void WaveformDisplayColumn::setShowPinnedWaveforms(bool show)
 
 void WaveformDisplayColumn::updatePortSelectionBox(bool switchToFirstPort)
 {
-    QString selectedItemText = portComboBox->currentText();
-    int n = portComboBox->count();
-    for (int i = n - 1; i >= 0; --i) {
-        portComboBox->removeItem(i);
-    }
-    portComboBox->addItems(state->signalSources->populatedGroupListWithChannelCounts());
+    const QString selectedPort = getSelectedPort();
+    const QSignalBlocker blocker(portComboBox);
+    portComboBox->clear();
+    populatePortComboBox();
     portComboBox->setCurrentIndex(0);  // Default to first port on new combo box list...
     if (!switchToFirstPort) {
-        portComboBox->setCurrentText(selectedItemText); // ... but if previous selection is present, use that. Don't do this if we switch to first port.
+        setSelectedPort(selectedPort); // ... but if previous selection is present, use that. Don't do this if we switch to first port.
     }
     waveformPlot->adjustToNewNumberOfPorts(portComboBox->count());
     // Caller should probably force updateFromState() after calling this function.
@@ -307,7 +391,7 @@ QString WaveformDisplayColumn::getColumnSettingsString() const
 
     columnSettings += visible ? "ShowColumn" : "HideColumn";
     columnSettings += ParameterSeparator;
-    columnSettings += portComboBox->currentText().section(" (", 0, 0);
+    columnSettings += getSelectedPort();
     columnSettings += ParameterSeparator;
     columnSettings += waveformPlot->getScrollBarStateString();
     columnSettings += ParameterSeparator;
